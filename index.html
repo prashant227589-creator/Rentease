@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RentEase Pro | Premium Landlord Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    backdropBlur: {
+                        xs: '2px',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- React & Framer Motion -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <script crossorigin src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.3);
+            --premium-gradient: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--premium-gradient);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        h1,
+        h2,
+        h3,
+        .font-heading {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
+
+        .glass-sidebar {
+            background: rgba(6, 78, 59, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .emerald-mesh {
+            background-color: #f0fdf4;
+            background-image:
+                radial-gradient(at 0% 0%, hsla(161, 71%, 91%, 1) 0, transparent 50%),
+                radial-gradient(at 50% 0%, hsla(152, 76%, 80%, 1) 0, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(162, 88%, 88%, 1) 0, transparent 50%);
+        }
+
+        .text-glow {
+            text-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Hide scrollbars for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-900">
+    <div id="root"></div>
+
+    <script>
+        // CRITICAL: Error Handling for debugging blank screen
+        window.onerror = function (msg, url, line, col, error) {
+            const div = document.createElement('div');
+            div.style.position = 'fixed';
+            div.style.top = '0';
+            div.style.left = '0';
+            div.style.width = '100%';
+            div.style.backgroundColor = '#fee2e2';
+            div.style.color = '#b91c1c';
+            div.style.padding = '20px';
+            div.style.zIndex = '9999';
+            div.style.fontFamily = 'monospace';
+            div.style.borderBottom = '1px solid #ef4444';
+            div.innerHTML = `<strong>Runtime Error:</strong><br>${msg}<br><br>Location: ${url}:${line}:${col}<br><br>Stack: ${error?.stack}`;
+            document.body.appendChild(div);
+            return false;
+        };
+    </script>
+
+    <script>
+        // Ensure globals are available or throw clear error
+        if (!window.React) throw new Error("React not loaded");
+        if (!window.ReactDOM) throw new Error("ReactDOM not loaded");
+
+        const { useState, useEffect, useMemo } = React;
+
+        // Safely resolve Framer Motion global
+        const MotionLib = window.FramerMotion || window.Motion;
+        if (!MotionLib) throw new Error("Framer Motion not loaded. Check CDN.");
+        const { motion, AnimatePresence } = MotionLib;
+
+        // Safely resolve HTM
+        const htmLib = window.htm;
+        if (!htmLib) throw new Error("HTM library not loaded.");
+        const html = htmLib.bind(React.createElement);
+
+        // --- COMPONENTS ---
+
+        const StatusBadge = ({ status }) => {
+            const isPaid = status === 'Paid';
+            const isOverdue = status === 'Overdue';
+
+            return html`
+                <span class=${`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest ${isPaid ? 'bg-emerald-100/80 text-emerald-800 border border-emerald-200' :
+                    isOverdue ? 'bg-red-100/80 text-red-800 border border-red-200' :
+                        'bg-amber-100/80 text-amber-800 border border-amber-200'
+                }`}>
+                    ${status}
+                </span>
+            `;
+        };
+
+        const formatDate = (dateStr) => {
+            if (!dateStr || dateStr === 'N/A') return 'N/A';
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date)) return dateStr;
+
+                // Format to IST (+5:30) with Short Time HH:MM
+                return new Intl.DateTimeFormat('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: 'Asia/Kolkata'
+                }).format(date);
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
+        const TenantCard = ({ tenant, onDelete, onSendSMS, onEdit, onToggleVisibility }) => {
+            const daysToRenew = Math.floor((new Date(tenant.LeaseEnd) - new Date()) / (1000 * 60 * 60 * 24));
+            const renewSoon = daysToRenew <= 30 && daysToRenew >= 0;
+            const isOverdue = tenant.PaymentStatus === 'Overdue';
+            const isInactive = tenant.Visibility === 'Inactive';
+
+            // Try multiple possible field names for tenant name
+            const tenantName = tenant.TenantName || tenant['Tenant Name'] || tenant.tenantName || 'Unnamed Tenant';
+
+
+            return html`
+            <${motion.div}
+                layout
+                initial=${{ opacity: 0, y: 20 }}
+                animate=${{ opacity: 1, y: 0 }}
+                exit=${{ opacity: 0, scale: 0.95 }}
+                whileHover=${{ y: -5 }}
+                class=${`glass-card rounded-3xl p-6 transition-all duration-300 ${isOverdue ? 'ring-2 ring-red-500/50' : ''} ${isInactive ? 'opacity-60 grayscale' : ''}`}
+            >
+                <div class="flex justify-between items-start mb-6">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-xl font-extrabold text-gray-900 tracking-tight">${tenantName}</h3>
+                            ${isInactive && html`<span class="bg-gray-200/50 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border border-gray-300">Hidden</span>`}
+                        </div>
+                        <p class="text-sm text-gray-500 font-medium mt-1 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            ${tenant.PropertyAddress}
+                        </p>
+                        ${renewSoon && html`
+                            <div class="mt-2 inline-flex items-center gap-1.5 bg-orange-50 border border-orange-100 px-2.5 py-1 rounded-lg">
+                                <span class="text-xs">⚠️</span>
+                                <span class="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Lease Expiring</span>
+                            </div>
+                        `}
+                    </div>
+                    <${StatusBadge} status=${tenant.PaymentStatus} />
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 mb-6 p-4 bg-white/40 rounded-2xl border border-white/50">
+                    <div class="flex items-center gap-3 text-sm text-gray-700 font-semibold">
+                        <span class="text-emerald-600">📞</span>
+                        ${tenant.Phone || 'No Phone'}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 mb-8 px-1">
+                    <div>
+                        <span class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Monthly Rent</span>
+                        <span class="text-lg font-bold text-gray-900">₹${tenant.RentAmount}</span>
+                    </div>
+                    <div>
+                         <span class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Deposit</span>
+                         <span class="text-sm font-bold text-gray-900">₹${tenant.SecurityDeposit || '0'}</span>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Lease Ends</span>
+                        <span class=${`text-sm font-bold ${renewSoon ? 'text-orange-600' : 'text-gray-900'}`}>
+                            ${formatDate(tenant.LeaseEnd)}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mt-auto">
+                    <button
+                        onClick=${() => onEdit(tenant)}
+                        class="bg-white/80 border border-emerald-100 text-emerald-700 py-3 rounded-2xl text-xs font-bold hover:bg-emerald-50 transition-all shadow-sm active:scale-95"
+                    >
+                        Edit Details
+                    </button>
+                    <button
+                        onClick=${() => onSendSMS(tenant)}
+                        class="bg-emerald-600 text-white py-3 rounded-2xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-700/20 active:scale-95"
+                    >
+                        Reminder
+                    </button>
+                    <button
+                        onClick=${() => onToggleVisibility(tenant)}
+                        class=${`col-span-1 py-3 rounded-2xl text-xs font-bold border transition-all active:scale-95 ${isInactive ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+                    >
+                        ${isInactive ? 'Set Active' : 'Hide Tenant'}
+                    </button>
+                    <button
+                        onClick=${() => onDelete(tenant)}
+                        class="bg-red-50 text-red-600 border border-red-100 py-3 rounded-2xl text-xs font-bold hover:bg-red-100 transition-all active:scale-95"
+                    >
+                        Delete
+                    </button>
+                </div>
+            <//>
+                `;
+        };
+
+        const FinancialSummary = ({ tenants }) => {
+            // Calculate financial metrics
+            const totalMonthlyRevenue = tenants.reduce((sum, tenant) => {
+                const rent = parseFloat(tenant.RentAmount) || 0;
+                return sum + rent;
+            }, 0);
+
+            const totalSecurityDeposits = tenants.reduce((sum, tenant) => {
+                const deposit = parseFloat(tenant.SecurityDeposit) || 0;
+                return sum + deposit;
+            }, 0);
+
+            const paidCount = tenants.filter(t => t.PaymentStatus === 'Paid').length;
+            const overdueCount = tenants.filter(t => t.PaymentStatus === 'Overdue').length;
+
+            const formatCurrency = (amount) => {
+                return new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: 'INR',
+                    maximumFractionDigits: 0
+                }).format(amount);
+            };
+
+            return html`
+                <div class="mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+                    <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl shadow-lg p-6 text-white transform hover:scale-105 transition-all">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-emerald-100 text-xs font-bold uppercase tracking-wider mb-1">Total Monthly Revenue</p>
+                        <p class="text-3xl font-black">${formatCurrency(totalMonthlyRevenue)}</p>
+                        <p class="text-emerald-100 text-xs mt-2">From ${tenants.length} active ${tenants.length === 1 ? 'tenant' : 'tenants'}</p>
+                    </div>
+
+
+                    <div class="bg-white rounded-2xl shadow-lg border-2 border-gray-100 p-6 transform hover:scale-105 transition-all">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Held Security Deposits</p>
+                        <p class="text-3xl font-black text-gray-900">${formatCurrency(totalSecurityDeposits)}</p>
+                        <p class="text-gray-400 text-xs mt-2 font-medium">Fully refundable</p>
+                    </div>
+
+
+                    <div class="bg-white rounded-2xl shadow-lg border-2 border-gray-100 p-6 transform hover:scale-105 transition-all">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Payment Status</p>
+                                <div class="flex items-baseline gap-1">
+                                    <p class="text-3xl font-black text-emerald-600">${paidCount}</p>
+                                    <p class="text-sm font-bold text-gray-400">Paid</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-3xl font-black text-red-500">${overdueCount}</p>
+                                <p class="text-sm font-bold text-gray-400">Overdue</p>
+                            </div>
+                        </div>
+                    </div>
+
+
+                <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-lg p-6 text-white transform hover:scale-105 transition-all">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                            <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <p class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Portfolio Health</p>
+                    <p class="text-3xl font-black text-white">98%</p>
+                    <p class="text-emerald-400 text-xs mt-2 font-bold">Optimization Score</p>
+                </div>
+                </div>
+            `;
+
+        };
+
+        const Toast = ({ message, type, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 4000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+
+            return html`
+            <${motion.div}
+                initial=${{ opacity: 0, y: -50, scale: 0.9 }}
+                animate=${{ opacity: 1, y: 0, scale: 1 }}
+                exit=${{ opacity: 0, scale: 0.9 }}
+                class=${`fixed top-6 right-6 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border backdrop-blur-xl ${type === 'success' ? 'bg-emerald-500/90 text-white border-emerald-400' : 'bg-red-500/90 text-white border-red-400'}`}
+                        >
+                            <span class="text-xl">${type === 'success' ? '✅' : '🚨'}</span>
+                            <span class="font-bold tracking-tight">${message}</span>
+                            <button onClick=${onClose} class="ml-4 opacity-70 hover:opacity-100">✕</button>
+                        <//>
+            `;
+        };
+
+        const AddTenantInput = ({ label, type = 'text', value, onChange, required = true, full = false }) => html`
+            <div class=${full ? 'md:col-span-2' : ''}>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">${label}</label>
+                <input
+                    required=${required}
+                    type=${type}
+                    class="w-full bg-gray-50/50 border-gray-200 border-2 rounded-2xl p-3 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-semibold outline-none"
+                    value=${value}
+                    onInput=${onChange}
+                />
+            </div>
+        `;
+
+        const AddTenantForm = ({ onAdd, onCancel }) => {
+            const [formData, setFormData] = useState({
+                TenantName: '', Phone: '', Email: '', PropertyAddress: '',
+                RentAmount: '', SecurityDeposit: '', LeaseStart: '', LeaseEnd: '',
+                PaymentStatus: 'Unpaid', EmergencyContact: '', Visibility: 'Active'
+            });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onAdd(formData);
+            };
+
+            return html`
+            <div class="fixed inset-0 bg-emerald-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+                <${motion.div}
+                    initial=${{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate=${{ opacity: 1, scale: 1, y: 0 }}
+                    class="glass-card w-full max-w-xl rounded-[2.5rem] shadow-2xl p-10 overflow-y-auto max-h-[90vh]"
+                >
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-black text-gray-900 tracking-tighter">Add New Tenant</h2>
+                            <p class="text-gray-500 text-sm font-medium mt-1">Onboard a new property resident</p>
+                        </div>
+                        <div class="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center text-2xl shadow-inner">✨</div>
+                    </div>
+
+                    <form onSubmit=${handleSubmit}>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
+                            <${AddTenantInput} label="Full Name" value=${formData.TenantName} full=${true} onChange=${e => setFormData({ ...formData, TenantName: e.target.value })} />
+                            <${AddTenantInput} label="Phone" type="tel" value=${formData.Phone} onChange=${e => setFormData({ ...formData, Phone: e.target.value })} />
+                            <${AddTenantInput} label="Email" type="email" value=${formData.Email} onChange=${e => setFormData({ ...formData, Email: e.target.value })} />
+                            <${AddTenantInput} label="Property Address" value=${formData.PropertyAddress} full=${true} onChange=${e => setFormData({ ...formData, PropertyAddress: e.target.value })} />
+                            <${AddTenantInput} label="Monthly Rent (₹)" type="number" value=${formData.RentAmount} onChange=${e => setFormData({ ...formData, RentAmount: e.target.value })} />
+                            <${AddTenantInput} label="Security Deposit (₹)" type="number" value=${formData.SecurityDeposit} onChange=${e => setFormData({ ...formData, SecurityDeposit: e.target.value })} />
+                            <${AddTenantInput} label="Lease Start" type="date" value=${formData.LeaseStart} onChange=${e => setFormData({ ...formData, LeaseStart: e.target.value })} />
+                            <${AddTenantInput} label="Lease End" type="date" value=${formData.LeaseEnd} onChange=${e => setFormData({ ...formData, LeaseEnd: e.target.value })} />
+
+                            <div class="md:col-span-2">
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Initial Status</label>
+                                <select
+                                    class="w-full bg-gray-50/50 border-gray-200 border-2 rounded-2xl p-3 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-semibold outline-none appearance-none"
+                                    value=${formData.PaymentStatus}
+                                    onChange=${e => setFormData({ ...formData, PaymentStatus: e.target.value })}
+                                >
+                                    <option value="Unpaid">Unpaid</option>
+                                    <option value="Paid">Paid (Current Month)</option>
+                                    <option value="Overdue">Overdue</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <button type="button" onClick=${onCancel} class="flex-1 px-4 py-4 border-2 border-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-50 transition-all active:scale-95">Cancel</button>
+                            <button type="submit" class="flex-1 px-4 py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-xl shadow-emerald-700/20 hover:bg-emerald-700 active:scale-95 transition-all">Onboard Tenant</button>
+                        </div>
+                    </form>
+                <//>
+                        </div>
+            `;
+        };
+
+        const EditTenantInput = ({ label, type = 'text', value, onChange, full = false }) => html`
+            <div class=${full ? 'md:col-span-2' : ''}>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">${label}</label>
+                <input
+                    required
+                    type=${type}
+                    class="w-full bg-gray-50/50 border-gray-200 border-2 rounded-2xl p-3 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-semibold outline-none"
+                    value=${value}
+                    onInput=${onChange}
+                />
+            </div>
+        `;
+
+        const EditTenantForm = ({ tenant, onUpdate, onCancel }) => {
+            const [formData, setFormData] = useState({
+                TenantName: tenant.TenantName || '',
+                Phone: tenant.Phone || '',
+                Email: tenant.Email || '',
+                PropertyAddress: tenant.PropertyAddress || '',
+                RentAmount: tenant.RentAmount || '',
+                SecurityDeposit: tenant.SecurityDeposit || '',
+                LeaseStart: tenant.LeaseStart ? tenant.LeaseStart.split('T')[0] : '',
+                LeaseEnd: tenant.LeaseEnd ? tenant.LeaseEnd.split('T')[0] : '',
+                PaymentStatus: tenant.PaymentStatus || 'Paid',
+                EmergencyContact: tenant.EmergencyContact || ''
+            });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onUpdate({ ...tenant, ...formData });
+            };
+
+            return html`
+            <div class="fixed inset-0 bg-blue-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+                <${motion.div}
+                    initial=${{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate=${{ opacity: 1, scale: 1, y: 0 }}
+                    class="glass-card w-full max-w-xl rounded-[2.5rem] shadow-2xl p-10 overflow-y-auto max-h-[90vh]"
+                >
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-black text-gray-900 tracking-tighter">Edit Details</h2>
+                            <p class="text-gray-500 text-sm font-medium mt-1">Update tenant profile</p>
+                        </div>
+                        <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-2xl">📝</div>
+                    </div>
+
+                    <form onSubmit=${handleSubmit}>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
+                            <${EditTenantInput} label="Full Name" value=${formData.TenantName} full=${true} onChange=${e => setFormData({ ...formData, TenantName: e.target.value })} />
+                            <${EditTenantInput} label="Phone" type="tel" value=${formData.Phone} onChange=${e => setFormData({ ...formData, Phone: e.target.value })} />
+                            <${EditTenantInput} label="Email" type="email" value=${formData.Email} onChange=${e => setFormData({ ...formData, Email: e.target.value })} />
+                            <${EditTenantInput} label="Property Address" value=${formData.PropertyAddress} full=${true} onChange=${e => setFormData({ ...formData, PropertyAddress: e.target.value })} />
+                            <${EditTenantInput} label="Monthly Rent (₹)" type="number" value=${formData.RentAmount} onChange=${e => setFormData({ ...formData, RentAmount: e.target.value })} />
+                            <${EditTenantInput} label="Security Deposit (₹)" type="number" value=${formData.SecurityDeposit} onChange=${e => setFormData({ ...formData, SecurityDeposit: e.target.value })} />
+                            <${EditTenantInput} label="Lease Start" type="date" value=${formData.LeaseStart} onChange=${e => setFormData({ ...formData, LeaseStart: e.target.value })} />
+                            <${EditTenantInput} label="Lease End" type="date" value=${formData.LeaseEnd} onChange=${e => setFormData({ ...formData, LeaseEnd: e.target.value })} />
+                        </div>
+
+                        <div class="flex gap-4">
+                            <button type="button" onClick=${onCancel} class="flex-1 px-4 py-4 border-2 border-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-50 active:scale-95 transition-all">Cancel</button>
+                            <button type="submit" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-700/20 hover:bg-blue-700 active:scale-95 transition-all">Save Changes</button>
+                        </div>
+                    </form>
+                <//>
+                        </div>
+            `;
+        };
+
+        const AIConfirmationModal = ({ data, onConfirm, onCancel, type }) => {
+            return html`
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
+                <${motion.div}
+                    initial=${{ opacity: 0, scale: 0.9, y: 30 }}
+                    animate=${{ opacity: 1, scale: 1, y: 0 }}
+                    class="glass-card max-w-md w-full rounded-[2.5rem] p-10 overflow-hidden relative border border-white/50"
+                >
+                    <div class="flex items-center gap-4 mb-8">
+                        <div class="w-14 h-14 bg-emerald-100/80 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-emerald-200">🤖</div>
+                        <div>
+                            <h3 class="text-2xl font-black text-gray-900 tracking-tighter">AI Scanned</h3>
+                            <p class="text-xs text-gray-400 font-black uppercase tracking-widest mt-0.5">Verify details</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 mb-10">
+                        ${type === 'Receipt' ? html`
+                                <div class="p-5 bg-white/40 rounded-2xl border border-white/50">
+                                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Merchant</p>
+                                    <p class="font-bold text-gray-900 text-lg tracking-tight">${data.MerchantName}</p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="p-5 bg-white/40 rounded-2xl border border-white/50">
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Amount</p>
+                                        <p class="font-black text-emerald-600 text-lg italic">₹${data.TotalAmount}</p>
+                                    </div>
+                                    <div class="p-5 bg-white/40 rounded-2xl border border-white/50">
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Date</p>
+                                        <p class="font-bold text-gray-900">${data.Date}</p>
+                                    </div>
+                                </div>
+                            ` : html`
+                                <div class="p-5 bg-white/40 rounded-2xl border border-white/50">
+                                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Monthly Rent</p>
+                                    <p class="font-black text-emerald-600 text-xl tracking-tight">₹${data.MonthlyRent}</p>
+                                </div>
+                                <div class="p-5 bg-white/40 rounded-2xl border border-white/50">
+                                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Lease Expiry</p>
+                                    <p class="font-bold text-gray-900 text-lg">${data.LeaseExpiry}</p>
+                                </div>
+                            `}
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button onClick=${onCancel} class="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-2xl transition-all">Reject</button>
+                        <button onClick=${onConfirm} class="flex-1 py-4 bg-gray-900 text-white font-black rounded-2xl shadow-xl hover:bg-black active:scale-95 transition-all">Confirm</button>
+                    </div>
+                <//>
+                        </div>
+            `;
+        }
+
+        const LedgerFilters = ({ filterText, onFilterChange, statusFilter, onStatusChange, sortField, onSortChange }) => {
+            return html`
+                <div class="flex flex-col md:flex-row gap-4 mb-8">
+                    <div class="relative flex-1">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                        <input
+                            type="text"
+                            placeholder="Search tenants or properties..."
+                            class="w-full pl-12 pr-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                            value=${filterText}
+                            onInput=${(e) => onFilterChange(e.target.value)}
+                        />
+                    </div>
+                    <div class="flex gap-4">
+                         <select
+                            class="px-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm font-bold text-gray-600 cursor-pointer"
+                            value=${statusFilter}
+                            onChange=${(e) => onStatusChange(e.target.value)}
+                        >
+                            <option value="All">All Statuses</option>
+                            <option value="Paid">Paid Up-to-date</option>
+                            <option value="Overdue">Overdue / Unpaid</option>
+                        </select>
+                         <select
+                            class="px-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm font-bold text-gray-600 cursor-pointer"
+                            value=${sortField}
+                            onChange=${(e) => onSortChange(e.target.value)}
+                        >
+                            <option value="name">Sort by Name</option>
+                            <option value="status">Sort by Status</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+        };
+
+        const LedgerTenantCard = ({ tenant, ledger, onUpdateStatus, onClick, cellLoading }) => {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const paidCount = months.reduce((acc, m) => (ledger[m] === 'Paid' ? acc + 1 : acc), 0);
+            const progress = (paidCount / 12) * 100;
+            const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date());
+
+            return html`
+                <${motion.div}
+                    layout
+                    initial=${{ opacity: 0, y: 10 }}
+                    animate=${{ opacity: 1, y: 0 }}
+                    whileHover=${{ y: -2 }}
+                    class="glass-card rounded-3xl p-6 border border-white/60 hover:shadow-xl transition-all cursor-pointer group relative overflow-hidden"
+                    onClick=${() => onClick(tenant, ledger)}
+                >
+                    <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500 opacity-0 group-hover:opacity-100 transition-all"></div>
+
+                    <div class="flex justify-between items-start mb-4 pl-2">
+                        <div>
+                            <h3 class="text-lg font-black text-gray-900">${tenant.TenantName}</h3>
+                            <p class="text-xs text-gray-500 font-bold">${tenant.PropertyAddress}</p>
+                        </div>
+                        <div class="text-right">
+                             <div class="text-2xl font-black text-emerald-600">${paidCount}<span class="text-gray-300 text-sm">/12</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="h-2 w-full bg-gray-100 rounded-full mb-6 overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-1000" style=${{ width: `${progress}%` }}></div>
+                    </div>
+
+                    <!-- Month Grid -->
+                    <div class="grid grid-cols-6 gap-2" onClick=${(e) => e.stopPropagation()}>
+                        ${months.map(m => {
+                const status = ledger[m] || 'Unpaid';
+                const isPaid = status === 'Paid';
+                const isOverdue = status === 'Overdue';
+                const isCurrent = m === currentMonth;
+                const isLoading = cellLoading[`${ledger.TenantName}-${m}`];
+
+                return html`
+                                <div
+                                    key=${m}
+                                    onClick=${() => onUpdateStatus(ledger.TenantName, m, isPaid ? 'Unpaid' : 'Paid')}
+                                    class=${`
+                                        h-8 rounded-lg flex items-center justify-center text-[10px] font-black cursor-pointer transition-all border
+                                        ${isLoading ? 'animate-pulse bg-gray-200 border-gray-300' :
+                        isPaid ? 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200' :
+                            isOverdue ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200' :
+                                'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100'}
+                                        ${isCurrent ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}
+                                    `}
+                                    title=${`${m}: ${status}`}
+                                >
+                                    ${isLoading ? '...' : m}
+                                </div>
+                            `;
+            })}
+                    </div>
+                <//>
+            `;
+        };
+
+        const TenantDetailsModal = ({ tenant, ledger, onClose }) => {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const formatCurrency = (amount) => {
+                return new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: 'INR',
+                    maximumFractionDigits: 0
+                }).format(amount);
+            };
+
+            return html`
+                <div class="fixed inset-0 bg-gray-900/40 backdrop-blur-md z-[200] flex items-center justify-end">
+                    <${motion.div}
+                        initial=${{ x: '100%' }}
+                        animate=${{ x: 0 }}
+                        exit=${{ x: '100%' }}
+                        transition=${{ type: 'spring', damping: 25, stiffness: 200 }}
+                        class="h-full w-full max-w-md bg-white shadow-2xl p-8 overflow-y-auto"
+                    >
+                        <div class="flex items-center justify-between mb-8">
+                            <h2 class="text-2xl font-black text-gray-900 tracking-tight">Tenant Details</h2>
+                            <button onClick=${onClose} class="p-2 bg-gray-50 rounded-full hover:bg-gray-100 transition-all">✕</button>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-3xl p-6 mb-8 text-center border border-gray-100">
+                             <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-4 border-white shadow-sm">👤</div>
+                             <h3 class="text-xl font-black text-gray-900">${tenant.TenantName}</h3>
+                             <p class="text-sm text-gray-500 font-bold mb-4">${tenant.PropertyAddress}</p>
+                             <div class="flex justify-center gap-3">
+                                <a href=${`tel:${tenant.Phone}`} class="p-3 bg-white rounded-xl shadow-sm text-emerald-600 hover:scale-110 transition-all">📞</a>
+                                <a href=${`mailto:${tenant.Email}`} class="p-3 bg-white rounded-xl shadow-sm text-blue-600 hover:scale-110 transition-all">✉️</a>
+                             </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div>
+                                <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Lease Information</h4>
+                                <div class="bg-white border-2 border-gray-50 rounded-2xl p-4 space-y-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-xs font-bold text-gray-500">Monthly Rent</span>
+                                        <span class="text-sm font-black text-gray-900">${formatCurrency(tenant.RentAmount)}</span>
+                                    </div>
+                                     <div class="flex justify-between">
+                                        <span class="text-xs font-bold text-gray-500">Lease Ends</span>
+                                        <span class="text-sm font-black text-gray-900">${formatDate(tenant.LeaseEnd)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                             <div>
+                                <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Yearly Payment Record</h4>
+                                <div class="space-y-2">
+                                    ${months.map(m => {
+                const status = ledger[m] || 'Unpaid';
+                return html`
+                                            <div class="flex items-center justify-between p-3 rounded-xl ${status === 'Paid' ? 'bg-emerald-50/50' : status === 'Overdue' ? 'bg-red-50/50' : 'bg-amber-50/50'}">
+                                                <span class="font-bold text-gray-700 w-12">${m}</span>
+                                                <span class=${`text-xs font-black uppercase px-2 py-1 rounded-md ${status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : status === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>${status}</span>
+                                            </div>
+                                        `;
+            })}
+                                </div>
+                            </div>
+                        </div>
+
+                    <//>
+                </div>
+            `;
+        };
+
+        const PaymentLedger = ({ ledgerData, onUpdateStatus, loading, cellLoading, showHidden, tenants }) => {
+            const [filterText, setFilterText] = useState('');
+            const [statusFilter, setStatusFilter] = useState('All');
+            const [sortField, setSortField] = useState('name');
+            const [selectedTenant, setSelectedTenant] = useState(null);
+
+            // Merge ledger data with tenant details
+            const mergedData = useMemo(() => {
+                return ledgerData.map(row => {
+                    const tenantDetails = tenants.find(t => t.TenantName === row.TenantName) || {};
+                    return { ...row, ...tenantDetails }; // Ledger row + Tenant Details (Phone, Address, etc.)
+                });
+            }, [ledgerData, tenants]);
+
+            const filteredAndSortedData = useMemo(() => {
+                let data = mergedData;
+
+                if (!showHidden) {
+                    data = data.filter(row => row.Visibility !== 'Inactive');
+                }
+
+                if (filterText) {
+                    const lowerText = filterText.toLowerCase();
+                    data = data.filter(row =>
+                        (row.TenantName && row.TenantName.toLowerCase().includes(lowerText)) ||
+                        (row.PropertyAddress && row.PropertyAddress.toLowerCase().includes(lowerText))
+                    );
+                }
+
+                if (statusFilter !== 'All') {
+                    const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date());
+                    data = data.filter(row => {
+                        if (statusFilter === 'Paid') return row[currentMonth] === 'Paid';
+                        if (statusFilter === 'Overdue') return row[currentMonth] !== 'Paid'; // Covers Unpaid/Overdue
+                        return true;
+                    });
+                }
+
+                return data.sort((a, b) => {
+                    if (sortField === 'name') return a.TenantName.localeCompare(b.TenantName);
+                    if (sortField === 'status') {
+                        const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date());
+                        const statusA = a[currentMonth] || 'Z'; // 'Z' pushes undefined to bottom
+                        const statusB = b[currentMonth] || 'Z';
+                        return statusA.localeCompare(statusB);
+                    }
+                    return 0;
+                });
+            }, [mergedData, showHidden, filterText, statusFilter, sortField]);
+
+            const openDetails = (tenant, ledger) => {
+                setSelectedTenant({ ...tenant, ledger });
+            };
+
+            return html`
+            <${motion.div}
+                initial=${{ opacity: 0 }}
+                animate=${{ opacity: 1 }}
+                class="space-y-6"
+            >
+                <${LedgerFilters}
+                    filterText=${filterText}
+                    onFilterChange=${setFilterText}
+                    statusFilter=${statusFilter}
+                    onStatusChange=${setStatusFilter}
+                    sortField=${sortField}
+                    onSortChange=${setSortField}
+                />
+
+                ${loading ? html`
+                     <div class="flex flex-col items-center justify-center py-20 gap-4">
+                        <div class="w-12 h-12 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin"></div>
+                        <p class="font-bold text-gray-400 italic">Syncing financial records...</p>
+                    </div>
+                ` : filteredAndSortedData.length === 0 ? html`
+                    <div class="bg-white rounded-[2rem] border-4 border-dashed border-gray-100 p-20 text-center">
+                        <h4 class="text-xl font-black text-gray-900 mb-2">No records found</h4>
+                        <p class="text-gray-400 font-bold">Try adjusting your search or filters.</p>
+                    </div>
+                ` : html`
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        ${filteredAndSortedData.map(item => html`
+                            <${LedgerTenantCard}
+                                key=${item.TenantName}
+                                tenant=${item}
+                                ledger=${item}
+                                onUpdateStatus=${onUpdateStatus}
+                                onClick=${() => openDetails(item, item)}
+                                cellLoading=${cellLoading}
+                            />
+                        `)}
+                    </div>
+                `}
+
+                <${AnimatePresence}>
+                    ${selectedTenant && html`
+                        <${TenantDetailsModal}
+                            tenant=${selectedTenant}
+                            ledger=${selectedTenant.ledger}
+                            onClose=${() => setSelectedTenant(null)}
+                        />
+                    `}
+                <//>
+            <//>
+            `;
+        };
+
+        const DeleteConfirmationModal = ({ tenant, onConfirm, onCancel }) => {
+            return html`
+            <div class="fixed inset-0 bg-red-900/40 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+                <${motion.div}
+                    initial=${{ opacity: 0, scale: 0.9, y: 30 }}
+                    animate=${{ opacity: 1, scale: 1, y: 0 }}
+                    class="glass-card max-w-sm w-full rounded-[2.5rem] p-8 relative border border-white/50"
+                >
+                    <div class="flex flex-col items-center text-center">
+                        <div class="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center text-3xl shadow-inner border border-red-200 mb-6">🗑️</div>
+                        <h3 class="text-2xl font-black text-gray-900 tracking-tighter mb-2">Delete Tenant?</h3>
+                        <p class="text-sm text-gray-500 font-medium mb-8 leading-relaxed">
+                            Are you sure you want to remove <span class="font-bold text-gray-800">${tenant.TenantName}</span>? This action cannot be undone.
+                        </p>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button onClick=${onCancel} class="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-2xl transition-all">Cancel</button>
+                        <button onClick=${onConfirm} class="flex-1 py-4 bg-red-500 text-white font-black rounded-2xl shadow-xl shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all">Delete</button>
+                    </div>
+                <//>
+            </div>
+            `;
+        };
+
+        // --- MAIN APP ---
+
+        const App = () => {
+            const [tenants, setTenants] = useState([]);
+            const [ledgerData, setLedgerData] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showAddForm, setShowAddForm] = useState(false);
+            const [editingTenant, setEditingTenant] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [toast, setToast] = useState(null); // {message, type}
+
+            // Track pending writes to prevent race conditions (Optimistic UI protection)
+            const [pendingWrites, setPendingWrites] = useState(0);
+            const [cellLoading, setCellLoading] = useState({}); // {'tenantName-month': true }
+            const [showHidden, setShowHidden] = useState(false);
+            const [deleteModal, setDeleteModal] = useState(null); // { tenant }
+            const [lastSyncTime, setLastSyncTime] = useState(null);
+
+            // API CONFIG - GOOGLE APPS SCRIPT WEB APP URL
+            const API_URL = 'https://script.google.com/macros/s/AKfycbzbjuaGsaKJ3oaaGkUr4_6e5j2JV3OfIHS3Mz9ANZpSp_Vs21rCY9D88W6R0QvtQgX1/exec';
+
+            const showToast = (message, type = 'success') => {
+                setToast({ message, type });
+            };
+
+            useEffect(() => {
+                if (API_URL) {
+                    fetchTenants();
+                    fetchLedger();
+                }
+                else {
+                    // Demo Mock Data
+                    setTenants([
+                        { id: 1, TenantName: 'John Doe', PropertyAddress: '123 Emerald Ave', RentAmount: 1200, LeaseEnd: '2026-02-15', PaymentStatus: 'Paid' },
+                        { id: 2, TenantName: 'Jane Doe', PropertyAddress: '456 Mint St', RentAmount: 950, LeaseEnd: '2026-05-20', PaymentStatus: 'Overdue' }
+                    ]);
+                    setLoading(false);
+                }
+            }, []);
+
+            // --- SYNC EFFECT: Align Dashboard with Ledger ---
+            // Ensure PaymentStatus on Dashboard matches the Ledger for the current month.
+            // Ledger is considered the 'Source of Truth' for monthly details.
+            useEffect(() => {
+                if (loading || tenants.length === 0 || ledgerData.length === 0) return;
+
+                const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date());
+                const updates = [];
+
+                tenants.forEach(tenant => {
+                    const ledgerRow = ledgerData.find(l => l.TenantName === tenant.TenantName);
+                    if (ledgerRow) {
+                        const ledgerStatus = ledgerRow[currentMonth];
+                        // If ledger has a status for this month, and it differs from Dashboard
+                        if (ledgerStatus && ledgerStatus !== tenant.PaymentStatus) {
+                            updates.push({ id: tenant.id, status: ledgerStatus });
+                        }
+                    }
+                });
+
+                if (updates.length > 0) {
+                    console.log('🔄 Auto-Syncing Dashboard Staus from Ledger:', updates);
+                    setTenants(prev => prev.map(t => {
+                        const update = updates.find(u => u.id === t.id);
+                        return update ? { ...t, PaymentStatus: update.status } : t;
+                    }));
+                }
+            }, [ledgerData, loading]); // Run when ledger data arrives or loading finishes
+
+            const fetchTenants = async () => {
+                // Do not fetch/overwrite if we are in the middle of writing data
+                if (pendingWrites > 0) return;
+
+                setLoading(true);
+                try {
+                    const res = await fetch(API_URL);
+                    const data = await res.json();
+                    setTenants(data);
+                } catch (err) { console.error('❌ Error fetching tenants:', err); }
+                setLoading(false);
+            };
+
+            const fetchLedger = async () => {
+                if (!API_URL) return;
+
+                // CRITICAL: Prevent read overwriting local state during write
+                if (pendingWrites > 0) {
+                    console.log('Skipping ledger fetch due to pending writes');
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`${API_URL}?type=ledger`);
+                    const data = await res.json();
+                    setLedgerData(data);
+                    setLastSyncTime(new Date());
+                } catch (err) { console.error('❌ Error fetching ledger:', err); }
+            };
+
+            const saveTenant = async (newData) => {
+                setLoading(true);
+                setPendingWrites(prev => prev + 1);
+
+                // Optimistic UI update
+                const optimisticId = Date.now();
+                setTenants(prev => [...prev, { id: optimisticId, ...newData }]);
+                setShowAddForm(false);
+
+                if (!API_URL) {
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    console.log('⏳ Adding to Tenants...');
+                    // 1. Add to Tenants sheet first
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({ action: 'addTenantOnly', ...newData })
+                    });
+
+                    console.log('✅ Sent Add request for Tenants. Now adding to RentTracking...');
+
+                    // 2. Add to RentTracking sheet
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({ action: 'addTrackingOnly', ...newData })
+                    });
+
+                    console.log('✅ Synchronous Write Complete');
+                    showToast('Tenant and Ledger entry sync triggered!');
+
+                    // Delay slightly to let GAS finish processing before re-fetching
+                    setTimeout(() => {
+                        fetchTenants();
+                        fetchLedger();
+                    }, 2500);
+                } catch (err) {
+                    console.error('❌ Write Failed:', err);
+                    showToast('Failed to sync. Re-syncing...', 'error');
+                    fetchTenants();
+                } finally {
+                    setLoading(false);
+                    setPendingWrites(prev => prev - 1); // Should add this if using pending writes state
+                }
+            };
+
+            const handleDelete = (tenant) => {
+                setDeleteModal(tenant);
+            };
+
+            const confirmDelete = async () => {
+                const tenant = deleteModal;
+                setDeleteModal(null);
+                if (!tenant) return;
+
+                // Optimistic UI update
+                setTenants(prev => prev.filter(t => t.id !== tenant.id));
+
+                if (API_URL) {
+                    try {
+                        await fetch(API_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                action: 'delete',
+                                id: tenant.id,
+                                TenantName: tenant.TenantName,
+                                PropertyAddress: tenant.PropertyAddress
+                            })
+                        });
+
+                        // Also update ledger state optimistically
+                        setLedgerData(prev => prev.filter(l => l.TenantName !== tenant.TenantName));
+
+                        showToast('Tenant successfully deleted');
+
+                        // Wait a bit and re-fetch to ensure consistency
+                        setTimeout(fetchTenants, 1000);
+                    } catch (err) {
+                        console.error("Delete failed:", err);
+                        showToast("Could not delete from sheet. Re-syncing...", 'error');
+                        fetchTenants();
+                    }
+                }
+            };
+
+            const handleEdit = (tenant, action, file) => {
+                if (action === 'upload') {
+                    handleFileUpload(tenant, file, 'Lease');
+                } else {
+                    setEditingTenant(tenant);
+                }
+            };
+
+            const handleUpdateTenant = async (updatedTenant) => {
+                setLoading(true);
+                setPendingWrites(prev => prev + 1);
+
+                try {
+                    const oldTenant = tenants.find(t => t.id === updatedTenant.id);
+                    const oldName = oldTenant ? oldTenant.TenantName : null;
+                    const statusChanged = oldTenant && oldTenant.PaymentStatus !== updatedTenant.PaymentStatus;
+
+                    // Optimistic UI Update: Tenants
+                    setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
+                    setEditingTenant(null);
+
+                    // Optimistic UI Update: Ledger (if status changed or name changed)
+                    const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date());
+                    setLedgerData(prev => prev.map(row => {
+                        if (row.TenantName === (oldName || updatedTenant.TenantName)) {
+                            const newRow = { ...row, TenantName: updatedTenant.TenantName };
+                            if (statusChanged) {
+                                newRow[currentMonth] = updatedTenant.PaymentStatus;
+                                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                newRow.TotalPaid = months.reduce((count, m) => (newRow[m] === 'Paid' ? count + 1 : count), 0);
+                            }
+                            return newRow;
+                        }
+                        return row;
+                    }));
+
+                    if (API_URL) {
+                        const res1 = await fetch(API_URL, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'update',
+                                id: updatedTenant.id,
+                                oldName: oldName,
+                                ...updatedTenant
+                            })
+                        });
+
+                        if (!res1.ok) throw new Error('Failed to update tenant details');
+
+                        if (statusChanged) {
+                            await fetch(API_URL, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    action: 'updateLedger',
+                                    TenantName: updatedTenant.TenantName,
+                                    Month: currentMonth,
+                                    Status: updatedTenant.PaymentStatus
+                                })
+                            });
+                        }
+
+                        showToast('Tenant updated and tabs synced!');
+                    }
+                } catch (err) {
+                    console.error("Update failed:", err);
+                    showToast("Update failed. Re-syncing...", 'error');
+                    fetchTenants();
+                } finally {
+                    setPendingWrites(prev => prev - 1);
+                    setLoading(false);
+                }
+            };
+
+            const handleToggleVisibility = async (tenant) => {
+                const newVisibility = tenant.Visibility === 'Inactive' ? 'Active' : 'Inactive';
+
+                // Optimistic UI
+                setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, Visibility: newVisibility } : t));
+
+                if (API_URL) {
+                    try {
+                        await fetch(API_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                action: 'setVisibility',
+                                TenantName: tenant.TenantName,
+                                visibility: newVisibility
+                            })
+                        });
+                        showToast(`Tenant marked as ${newVisibility} `);
+                    } catch (err) {
+                        console.error("Visibility toggle failed:", err);
+                        showToast("Failed to update visibility", 'error');
+                        fetchTenants();
+                    }
+                }
+            };
+
+            const [aiModal, setAiModal] = useState(null);
+
+            const handleFileUpload = async (tenant, file, type = 'Lease') => {
+                if (!file) return;
+                setLoading(true);
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const base64 = e.target.result.split(',')[1];
+                    const mimeType = file.type;
+
+                    // Simulate AI Processing delay
+                    setTimeout(() => {
+                        let mockData = {};
+                        if (type === 'Receipt') {
+                            mockData = {
+                                MerchantName: 'Apex Plumbing Solutions',
+                                TotalAmount: '4,500',
+                                Date: '2026-01-25',
+                                PropertyAddress: tenant ? tenant.PropertyAddress : 'Detected: 123 Emerald Ave'
+                            };
+                        } else {
+                            mockData = {
+                                MonthlyRent: tenant ? tenant.RentAmount : '15,000',
+                                LeaseExpiry: '2027-12-31'
+                            };
+                        }
+
+                        setAiModal({
+                            tenant: tenant,
+                            type: type,
+                            data: mockData,
+                            fileName: file.name,
+                            base64: base64,
+                            mimeType: mimeType
+                        });
+                        setLoading(false);
+                    }, 2500);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const confirmAIExtraction = async () => {
+                if (!aiModal) return;
+                const { tenant, type, data, fileName, base64, mimeType } = aiModal;
+                setAiModal(null);
+                setLoading(true);
+
+                if (API_URL) {
+                    try {
+                        const payload = {
+                            action: 'saveScannedDoc',
+                            TenantName: tenant ? tenant.TenantName : (data.PropertyAddress ? tenants.find(t => data.PropertyAddress.includes(t.PropertyAddress))?.TenantName : null),
+                            docType: type,
+                            extractedData: data,
+                            fileName: fileName,
+                            base64: base64,
+                            mimeType: mimeType
+                        };
+
+                        await fetch(API_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify(payload)
+                        });
+
+                        alert(`✅ ${type} scanned and saved! ${type === 'Receipt' ? 'Maintenance status updated to Completed.' : ''} `);
+                        fetchTenants();
+                        if (type === 'Receipt') fetchLedger();
+                    } catch (err) {
+                        console.error('❌ Failed to save scanned doc', err);
+                        alert('Error saving document to cloud.');
+                    }
+                }
+                setLoading(false);
+            };
+
+            const sendSMS = (tenant) => {
+                const msg = encodeURIComponent(`Hi ${tenant.TenantName}, this is a reminder that your rent of ₹${tenant.RentAmount} for ${tenant.PropertyAddress} is due soon.`);
+                window.location.href = `sms:${tenant.Phone}?body=${msg}`;
+                alert(`Triggering SMS to ${tenant.Phone} `);
+            };
+
+            const handleUpdateLedgerStatus = async (tenantName, month, status) => {
+                const cellKey = `${tenantName}-${month}`;
+
+                // 1. Set Per-Cell Loading
+                setCellLoading(prev => ({ ...prev, [cellKey]: true }));
+                setPendingWrites(prev => prev + 1);
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'updateLedger',
+                            TenantName: tenantName,
+                            Month: month,
+                            Status: status
+                        })
+                    });
+
+                    if (!response.ok) {
+                        showToast(`Save Failed: Server returned ${response.status} `, 'error');
+                    } else {
+                        // 2. WAIT for backend confirmation
+                        const result = await response.json();
+                        console.log('✅ Update confirmed by backend:', result);
+
+                        // 3. UPDATE LOCAL STATE ONLY AFTER SUCCESS
+                        setLedgerData(prev => prev.map(row => {
+                            if (row.TenantName === tenantName) {
+                                const newRow = { ...row, [month]: status };
+                                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                newRow.TotalPaid = months.reduce((count, m) => (newRow[m] === 'Paid' ? count + 1 : count), 0);
+                                if (result.TotalPaid !== undefined) newRow.TotalPaid = result.TotalPaid;
+                                return newRow;
+                            }
+                            return row;
+                        }));
+
+                        const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date());
+                        if (month === currentMonth) {
+                            setTenants(prev => prev.map(t =>
+                                t.TenantName === tenantName ? { ...t, PaymentStatus: status } : t
+                            ));
+                        }
+
+                        showToast('Status saved!', 'success');
+
+                        // 4. PERSISTENCE CHECK: Confirm data has actually saved
+                        setTimeout(async () => {
+                            console.log('🔍 Performing Validation Fetch...');
+                            await fetchLedger();
+                        }, 5000);
+                    }
+                } catch (err) {
+                    console.error('❌ Ledger update failed', err);
+                    showToast('Save Failed: Network Error', 'error');
+                } finally {
+                    setCellLoading(prev => {
+                        const newState = { ...prev };
+                        delete newState[cellKey];
+                        return newState;
+                    });
+                    setPendingWrites(prev => prev - 1);
+                }
+            };
+
+            const refreshSchema = async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(`${API_URL}?type=schema`);
+                    const data = await res.json();
+                    console.log('📋 Schema Refreshed:', data);
+                    showToast(`Schema Refreshed: ${data.headers.length} columns found.`);
+                    await fetchLedger();
+                } catch (err) {
+                    console.error('❌ Schema refresh failed', err);
+                    showToast('Failed to refresh schema', 'error');
+                }
+                setLoading(false);
+            };
+
+            return html`
+            <div class="min-h-screen bg-gray-50 flex flex-col lg:flex-row font-['Plus_Jakarta_Sans']">
+                <${AnimatePresence}>
+                    ${toast && html`<${Toast} message=${toast.message} type=${toast.type} onClose=${() => setToast(null)} />`}
+                <//>
+
+                            <nav class="w-full lg:w-72 bg-emerald-900 text-white flex-shrink-0 lg:min-h-screen relative z-30 shadow-2xl overflow-hidden">
+                                <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.1)_0%,transparent_50%)]"></div>
+
+                                <div class="p-8 relative z-10">
+                                    <h1 class="text-3xl font-black tracking-tighter flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-[1rem] bg-emerald-400 flex items-center justify-center text-emerald-950 shadow-lg shadow-emerald-400/20">R</div>
+                                        RentEase
+                                    </h1>
+                                </div>
+
+                                <ul class="mt-8 px-4 space-y-2 relative z-10">
+                                    ${[
+                    { id: 'dashboard', label: 'Dashboard', icon: '⚡' },
+                    { id: 'ledger', label: 'Payment Ledger', icon: '📊' },
+                    { id: 'maintenance', label: 'Maintenance', icon: '🛠️' }
+                ].map(item => html`
+                                <li
+                                    key=${item.id}
+                                    class=${`px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer transition-all duration-300 font-bold ${activeTab === item.id ? 'bg-white text-emerald-950 shadow-xl shadow-black/10' : 'hover:bg-white/5 text-emerald-100/60 hover:text-white'
+                    }`}
+                                    onClick=${() => setActiveTab(item.id)}
+                                >
+                                    <span class="text-xl">${item.icon}</span>
+                                    ${item.label}
+                                </li>
+                            `)}
+                                </ul>
+
+                                <div class="lg:absolute lg:bottom-10 lg:left-8 relative z-10 mt-20">
+                                    <div class="bg-emerald-800/50 backdrop-blur-md p-6 rounded-3xl border border-emerald-700/50">
+                                        <p class="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-1">Status</p>
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                                            <span class="text-xs font-bold">Cloud Connected</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </nav>
+
+                            <main class="flex-1 overflow-y-auto relative z-10 pb-20">
+                                <header class="bg-gray-50/80 backdrop-blur-xl px-10 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6 sticky top-0 z-20">
+                                    <div>
+                                        <h2 class="text-4xl font-black text-gray-900 tracking-tighter">
+                                            ${activeTab === 'dashboard' ? 'Overview' : activeTab === 'ledger' ? 'Rent Ledger' : 'Maintenance'}
+                                        </h2>
+                                        <p class="text-sm text-gray-500 font-medium mt-1">Managing ${tenants.length} active property units</p>
+                                    </div>
+
+                                    <div class="flex items-center gap-4">
+                                        <button
+                                            onClick=${() => setShowHidden(!showHidden)}
+                                            class=${`h-14 px-8 rounded-2xl font-black transition-all border-2 text-sm flex items-center gap-2 ${showHidden ? 'bg-gray-900 border-gray-900 text-white shadow-xl shadow-gray-900/10' : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200 shadow-sm'
+                }`}
+                                        >
+                                            ${showHidden ? 'Hide Inactive' : 'Show All'}
+                                        </button>
+
+                                        ${activeTab === 'ledger' && html`
+                                    <button
+                                        onClick=${refreshSchema}
+                                        class="h-14 bg-white border-2 border-emerald-100 text-emerald-700 px-8 rounded-2xl font-black text-sm hover:bg-emerald-50 transition-all flex items-center gap-2 shadow-sm"
+                                    >
+                                        Sync Cloud
+                                    </button>
+                                    ${lastSyncTime && html`
+                                        <div class="flex flex-col items-end mr-2">
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Synced</span>
+                                            <span class="text-xs font-bold text-emerald-600">${lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                    `}
+                                `}
+
+                                        ${activeTab === 'dashboard' && html`
+                                    <button
+                                        onClick=${() => setShowAddForm(true)}
+                                        class="h-14 bg-emerald-600 text-white px-8 rounded-2xl font-black text-sm shadow-2xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all transform active:scale-95 flex items-center gap-2"
+                                    >
+                                        <span class="text-xl">+</span> Add Tenant
+                                    </button>
+                                `}
+                                    </div>
+                                </header>
+
+                                <div class="px-10">
+                                    <${AnimatePresence} mode="wait">
+                                        ${activeTab === 'dashboard' ? html`
+                                    <${motion.div} 
+                                        key="dashboard"
+                                        initial=${{ opacity: 0, y: 10 }}
+                                        animate=${{ opacity: 1, y: 0 }}
+                                        exit=${{ opacity: 0, scale: 0.98 }}
+                                    >
+                                        ${loading ? html`
+                                            <div class="flex flex-col items-center justify-center py-40 gap-4">
+                                                <div class="w-16 h-16 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin"></div>
+                                                <p class="font-bold text-gray-400 italic">Syncing with Google Sheets...</p>
+                                            </div>
+                                        ` : html`
+                                            <${FinancialSummary} tenants=${tenants} />
+                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                                ${tenants
+                            .filter(t => showHidden || t.Visibility !== 'Inactive')
+                            .map(t => html`<${TenantCard} key=${t.id} tenant=${t} onDelete=${handleDelete} onSendSMS=${sendSMS} onEdit=${handleEdit} onToggleVisibility=${handleToggleVisibility} />`)}
+                                            </div>
+                                        `}
+                                    <//>
+                                ` : activeTab === 'ledger' ? html`
+                                    <${motion.div} 
+                                        key="ledger"
+                                        initial=${{ opacity: 0, y: 10 }}
+                                        animate=${{ opacity: 1, y: 0 }}
+                                    >
+                                        <${PaymentLedger}
+                                            ledgerData=${ledgerData}
+                                            onUpdateStatus=${handleUpdateLedgerStatus}
+                                            loading=${loading}
+                                            cellLoading=${cellLoading}
+                                            showHidden=${showHidden}
+                                            tenants=${tenants}
+                                        />
+                                    <//>
+                                ` : html`
+                                    <${motion.div} 
+                                        key="maintenance"
+                                        initial=${{ opacity: 0, y: 10 }}
+                                        animate=${{ opacity: 1, y: 0 }}
+                                        class="space-y-10"
+                                    >
+                                        <div class="bg-emerald-950 p-12 rounded-[3.5rem] text-white shadow-2xl overflow-hidden relative group">
+                                            <div class="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(16,185,129,0.3)_0%,transparent_50%)]"></div>
+                                            <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                                                <div class="max-w-md">
+                                                    <h3 class="text-4xl font-black mb-4 tracking-tighter italic">Maintenance AI</h3>
+                                                    <p class="text-emerald-300/80 font-medium leading-relaxed">Instantly process receipts and lease agreements using our proprietary AI extraction engine.</p>
+                                                </div>
+                                                <div class="relative z-10">
+                                                    <button
+                                                        onClick=${() => document.getElementById('receipt-upload').click()}
+                                                        class="h-20 px-12 bg-white text-emerald-950 rounded-[2rem] font-black text-lg shadow-2xl hover:bg-emerald-50 active:scale-95 transition-all flex items-center gap-4 group"
+                                                    >
+                                                        <span class="text-2xl transition-transform group-hover:rotate-12">📸</span>
+                                                        Scan Receipt
+                                                    </button>
+                                                    <input id="receipt-upload" type="file" class="hidden" accept="image/*" onChange=${(e) => handleFileUpload(null, e.target.files[0], 'Receipt')} />
+                                                </div>
+                                            </div>
+                                            <div class="absolute -right-20 -bottom-20 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all duration-700"></div>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                                            <div class="lg:col-span-2 space-y-6">
+                                                <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Maintenance Activity</h4>
+                                                ${tenants.filter(t => t.MaintenanceStatus && t.MaintenanceStatus !== 'None').length > 0 ? html`
+                                                    <div class="space-y-4">
+                                                        ${tenants.filter(t => t.MaintenanceStatus && t.MaintenanceStatus !== 'None').map(t => html`
+                                                            <div key=${t.id} class="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                                                <div class="flex items-center gap-6">
+                                                                    <div class=${`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-2xl ${t.MaintenanceStatus === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>
+                                                                        🛠️
+                                                                    </div>
+                                                                    <div>
+                                                                        <p class="font-black text-gray-900 text-lg tracking-tight">${t.PropertyAddress}</p>
+                                                                        <p class="text-sm text-gray-400 font-bold">Reported by ${t.TenantName}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <span class=${`text-[10px] font-black uppercase px-4 py-2 rounded-full border ${t.MaintenanceStatus === 'Completed' ? 'bg-emerald-50/50 text-emerald-700 border-emerald-100' : 'bg-orange-50/50 text-orange-700 border-orange-100'}`}>
+                                                                    ${t.MaintenanceStatus}
+                                                                </span>
+                                                            </div>
+                                                        `)}
+                                                    </div>
+                                                ` : html`
+                                                    <div class="bg-white rounded-[3rem] border-4 border-dashed border-gray-100 p-24 text-center">
+                                                        <div class="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl">🌫️</div>
+                                                        <h4 class="text-2xl font-black text-gray-900 mb-2 tracking-tighter">No active logs</h4>
+                                                        <p class="text-gray-400 font-medium max-w-xs mx-auto">Upload documents to populate the maintenance board.</p>
+                                                    </div>
+                                                `}
+                                            </div>
+
+                                            <div class="space-y-8">
+                                                <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden">
+                                                    <div class="absolute top-0 right-0 p-4 text-3xl opacity-10">💡</div>
+                                                    <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Efficiency Tips</h4>
+                                                    <div class="space-y-6">
+                                                        <div class="p-6 bg-blue-50/50 rounded-3xl border border-blue-100">
+                                                            <p class="text-[11px] text-blue-900 leading-relaxed font-bold italic mb-2">Automate Scans</p>
+                                                            <p class="text-xs text-blue-800/80 leading-relaxed font-semibold">Scanning leases sets auto-reminders for expiries 30 days out.</p>
+                                                        </div>
+                                                        <div class="p-6 bg-purple-50/50 rounded-3xl border border-purple-100">
+                                                            <p class="text-[11px] text-purple-900 leading-relaxed font-bold italic mb-2">Smart Insights</p>
+                                                            <p class="text-xs text-purple-800/80 leading-relaxed font-semibold">Receipt scans update property net profit margins in real-time.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <//>
+                                `}
+                                    <//>
+                                </div>
+                            </main>
+
+                            <${AnimatePresence}>
+                                ${showAddForm && html`<${AddTenantForm} onAdd=${saveTenant} onCancel=${() => setShowAddForm(false)} />`}
+                                ${editingTenant && html`<${EditTenantForm} tenant=${editingTenant} onUpdate=${handleUpdateTenant} onCancel=${() => setEditingTenant(null)} />`}
+                                ${aiModal && html`
+                            <${AIConfirmationModal}
+                                data=${aiModal.data}
+                                type=${aiModal.type}
+                                onConfirm=${confirmAIExtraction}
+                                onCancel=${() => setAiModal(null)}
+                            />
+                        `}
+                                ${deleteModal && html`
+                            <${DeleteConfirmationModal}
+                                tenant=${deleteModal}
+                                onConfirm=${confirmDelete}
+                                onCancel=${() => setDeleteModal(null)}
+                            />
+                        `}
+                            <//>
+                        </div>
+            `;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+
+</html>
